@@ -1,0 +1,9 @@
+#This is .gitignore file
+/.settings
+/bin
+/MyResources
+/src/components/ScrollDemo2.java
+/src/components/TableRenderDemo.java
+/src/components/TableRowRenderingTip.java
+.classpath
+.project
