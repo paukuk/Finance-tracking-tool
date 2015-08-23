@@ -1,9 +1,15 @@
 #This is .gitignore file
 /.settings
 /bin
+/files
 /MyResources
 /src/components/ScrollDemo2.java
 /src/components/TableRenderDemo.java
 /src/components/TableRowRenderingTip.java
+/src/components/FileCopy.java
+/src/components/FileCopy2.java
+/src/components/SimpleCalc.java
+
+/src/components/StringTask.java
 .classpath
 .project
