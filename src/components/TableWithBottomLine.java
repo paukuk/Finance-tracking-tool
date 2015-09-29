@@ -10,38 +10,30 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
-
 import java.awt.event.*;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
-
-import java.sql.BatchUpdateException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Properties;
-
-
-
 
 public class TableWithBottomLine extends JPanel implements TableModelListener {
     
 	public final static long MILS_IN_DAY = 1000 * 60 * 60 * 24;
 	
-//	private Connection connection;
-	static Connection connection = null;
-	static Statement stmt = null;
+	private Connection connection = null;
+	private Statement stmt = null;
+	private PreparedStatement prepStmt = null;
+	private ResultSet resSet = null;
 	
 	static JTable table;
 	static MyTableModel model;
@@ -49,22 +41,13 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 	JLabel bottomLabel2;		
 	java.util.Date lastDate;
 	
-
     public TableWithBottomLine() throws SQLException {
     	
     	super(new BorderLayout());
-        
-        try {
-			Class.forName("com.mysql.jdbc.Driver").newInstance();
-		} catch (Exception e) {
-			System.err.println("Unable to find and load driver");
-			System.exit(1);
-		}
-        
+                
         bottomLabel = new JLabel();
         bottomLabel2 = new JLabel();
         bottomLabel.setText(textForLabel());
-   //     bottomLabel2.setText(textForLabel());
         JPanel panel = new JPanel(new GridLayout(2,2));
         panel.setFocusable(true);
         panel.add(bottomLabel);
@@ -111,16 +94,11 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         //Add the scroll pane to this panel.
         add(scrollPane, BorderLayout.CENTER);
     }
-    
-    static Connection getConnection() {
-        return connection;
-    } 
-    
+        
     public ResultSet Execute_Query(String queryIn) throws SQLException {
-    	ResultSet resSet = null;   		
-   		try {    	   		
-   			connection = TableWithBottomLine.getConnection();
-   			Statement stmt = null;
+   		
+    	try {    	   		
+   			connection = ConnectionManager.getConnection();   	
    			stmt = connection.createStatement();
     	    resSet = stmt.executeQuery(queryIn);    	   			
    		} catch (SQLException e) {
@@ -131,14 +109,11 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     
     public String textForLabel() throws SQLException{
     	
-       	List<Float> floatArrayList = new ArrayList<Float>();
-     
+       	List<Float> floatArrayList = new ArrayList<Float>();     
     	   	String query ="SELECT f.Flat, f.Mobile, f.Food, f.Alcohol, f.Transport, f.Outdoor, f.Pauls_stuff, f.Stuff FROM finance.fin f WHERE f.tbl_Date >= DATE_FORMAT( NOW( ) ,  '%Y-%m-10' ) + INTERVAL IF( DAY( NOW( ) ) >10, 0 , -1 ) MONTH AND f.tbl_Date <= CURDATE( ) ";
-    	   	    	   
-    	    try {    	   	    
+    	   	try {    	   	    
     	    	ResultSet rs = null;
-    	    	rs = Execute_Query(query);    	   	
-    	    	
+    	    	rs = Execute_Query(query);    	    	
     	    	while (rs.next()){
     	    	  floatArrayList.add(rs.getFloat("Flat"));
     	    	  floatArrayList.add(rs.getFloat("Mobile"));
@@ -151,12 +126,8 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	    	}    	    
     	   } catch(SQLException ee){
     		   ee.printStackTrace();
-    	     }
-    /*	    finally {
-    	        stmt.close();
-    	    } */
-    	    Float[] array = floatArrayList.toArray(new Float[floatArrayList.size()]);
-  
+    	     }   
+    	    Float[] array = floatArrayList.toArray(new Float[floatArrayList.size()]);  
     	    float temp1 =0.0f;
     	    for (int i=0; i<array.length; i++){    	    	
     	    	temp1 = temp1 + array[i];    	   
@@ -165,88 +136,40 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	    sumToSpend = sumToSpend - temp1;
     	    String stringForLabel = Float.toString(sumToSpend);
     	    return "This month you can spend: -"+stringForLabel+"Lt";
-    //	return array;
     }  
     
     public void tableChanged(TableModelEvent e) {
         int row = e.getFirstRow();
         int col = e.getColumn();
         model = (MyTableModel) e.getSource();
-        String stulpPav = model.getColumnName(col);
-        Object data = model.getValueAt(row, col);
-        Object studId = model.getValueAt(row, 0);
-        System.out.println("tableChanded works");
+        String colName = model.getColumnName(col);
+        Object cellValue = model.getValueAt(row, col);
+        Object cell_Id = model.getValueAt(row, 0);
+
         try {
-            new ImportData(stulpPav, data, studId);
+            new ImportData(colName, cellValue, cell_Id);
             bottomLabel.setText(textForLabel());
         } catch (ClassNotFoundException e1) {
             e1.printStackTrace();
         } catch (SQLException e1) {
             e1.printStackTrace();
         }
-    }
-    
- /*   public void windowOpened(WindowEvent e) {
-		try {							
-			Statement statement = newContentPane.connection.createStatement();
-			ResultSet rs = statement.executeQuery(
-					"SELECT tbl_Date as Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor, Pauls_stuff, Income, Stuff FROM finance.fin");
-			TableModel model = DbUtils.resultSetToTableModel(rs);						
-			newContentPane.table.setModel(model);														
-		} catch (SQLException ee) {}						
-	} */
-   /*
-    static Connection getConnection() {
-        return connection;
-    } */
-    
- /*   public class ImportData {    
-
-    	public ImportData(String a, Object b, Object c)
-    	        throws ClassNotFoundException, SQLException {
-    	    Statement stmt = null;
-    	    try {
-    	    	connection = TableWithBottomLine.getConnection();
-    	        String stulpPav = a;
-    	        String duom = b.toString();
-    	        String studId = c.toString();
-    	        System.out.println(duom);
-    	        connection.setAutoCommit(false);
-    	        stmt = connection.createStatement();
-    	        stmt.addBatch("update finance.fin set " + stulpPav + " = " + duom
-    	                + " where ID = " + studId + ";");
-    	        stmt.executeBatch();
-    	        connection.commit();
-    	    } catch (BatchUpdateException e) {
-    	        e.printStackTrace();
-    	    } catch (SQLException e) {
-    	        e.printStackTrace();
-    	    } finally {
-    	        if (stmt != null)
-    	            stmt.close();
-    	        connection.setAutoCommit(true);
-    	        System.out.println("Data was imported to database");
-    	    }
-    	}   
-    } */  
+    }   
     
     public class ImportData {    
 
     	public ImportData(String a, Object b, Object c)
-    	        throws ClassNotFoundException, SQLException {
-    		PreparedStatement prepStmt = null;
+    	        throws ClassNotFoundException, SQLException {    	
     	    try {
-    	    	connection = TableWithBottomLine.getConnection();
-    	        String stulpPav = a;
-    	        String duom = b.toString();
-    	        String studId = c.toString();
-    	        System.out.println(duom);
-    	
+    	    	connection = ConnectionManager.getConnection();
+    	        String colName = a;
+    	        String cellValue = b.toString();
+    	        String cell_Id = c.toString();    	
     	        String updateString = "update finance.fin " + "set ? = ? " + "where ID = ? "+ ";";
     	        prepStmt = connection.prepareStatement(updateString);
-    	        prepStmt.setString(1, stulpPav);
-    	        prepStmt.setString(2, duom);
-    	        prepStmt.setString(3, studId);    	        
+    	        prepStmt.setString(1, colName);
+    	        prepStmt.setString(2, cellValue);
+    	        prepStmt.setString(3, cell_Id);    	        
     	        
     	    } catch (SQLException e) {
     	        e.printStackTrace();
@@ -254,7 +177,6 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	      finally {
     	        if (prepStmt != null)
     	            prepStmt.close();
-    	        System.out.println("Data was imported to database");
     	    }  
     	}   
     }
@@ -264,26 +186,15 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	Object data [][];
     	String columnNames [];
 
-   // 	public  MyTableModel(String grupName) throws SQLException{
-    	public  MyTableModel() throws SQLException{
-    /*	    String query ="select Studento_id, vardas_pavarde, 1_semestras,"+
-    	            " 2_semestras, egzaminas, bendras_balas "+
-    	            "from pki18." + grupName; */
-    		String query ="SELECT ID, tbl_Date as Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor, Pauls_stuff, Income, Stuff FROM finance.fin";    	
+    	public  MyTableModel() throws SQLException{    
+    		String query ="SELECT ID, tbl_Date as Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor"
+    				+ ", Pauls_stuff, Income, Stuff FROM finance.fin";    	
     	    
     		ResultSet rs = null;
     	   	rs = Execute_Query(query);
-    //		ResultSet rs ;
-    //	   connection = TableWithBottomLine.getConnection();
-
-    	//    Statement stmt = null;
-    	//    stmt = connection.createStatement();
-    	//    rs = stmt.executeQuery(query);
-
-    	    rs.last();
+     	    rs.last();
     	    rowCount = rs.getRow();
     	    data = new Object[rowCount][11];
-    	//    rs = stmt.executeQuery(query);
     	    rs = Execute_Query(query);
     	    for (int iEil = 0; iEil < rowCount; iEil++){
     	        rs.next();
@@ -297,12 +208,9 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	        data[iEil][7] = rs.getFloat("Outdoor");
     	        data[iEil][8] = rs.getFloat("Pauls_stuff");
     	        data[iEil][9] = rs.getFloat("Income");
-    	        data[iEil][10] = rs.getFloat("Stuff");     	   
-    	       
+    	        data[iEil][10] = rs.getFloat("Stuff");     	       
     	    }
-
             String[] columnName  = {"ID", "Date","Flat","Mobile"    	 
-        //    String[] columnName  = {"Date","Flat","Mobile"
     	            ,"Food","Alcohol","Transport", "Outdoor", "Pauls_stuff", "Income", "Stuff"};
     	     columnNames = columnName;
     	}   
@@ -328,26 +236,14 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	    data[row][col] = value;
     	    fireTableCellUpdated(row, col);
     	}
-    }
-
-    /**
-     * Create the GUI and show it.  For thread safety,
-     * this method should be invoked from the
-     * event-dispatching thread.
-     * @throws SQLException 
-     */
-  /*  private static java.sql.Date getCurrentDate() {
-        java.util.Date today = new java.util.Date();
-        return new java.sql.Date(today.getTime());
-    } */
-    
+    } 
+     
     private static java.sql.Date getDateForInsertion(Long date) {
       	Date tmp_date = new Date(date);  
         return new java.sql.Date(tmp_date.getTime());       
     }
     
     private static void createAndShowGUI() throws SQLException {
-        //Create and set up the window.
         JFrame frame = new JFrame("TableWithBottomLine");
         TableWithBottomLine tbl = new TableWithBottomLine();        
         
@@ -355,20 +251,11 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 				new WindowAdapter() {
 					public void windowOpened(WindowEvent e) {
 						try {						
-							tbl.bottomLabel2.setText("Text");						
-				    	    
-							String query ="SELECT f.tbl_Date FROM finance.fin f ORDER BY f.tbl_Date desc";
-						//	ResultSet rs ;
-							ResultSet rs = null;
-				    	   	rs = tbl.Execute_Query(query);
-				  //  	    connection = TableWithBottomLine.getConnection();
-				  //  	    Statement stmt = null;
-				    //	    stmt = connection.createStatement();
-				    //	    rs = stmt.executeQuery(query);
-				    	    rs.first();
-							tbl.lastDate = rs.getDate("tbl_Date");
-						//	System.out.println(tbl.lastDate);				    	  				    	    
-				    	  
+							tbl.bottomLabel2.setText("Text");				    	    
+							String query ="SELECT f.tbl_Date FROM finance.fin f ORDER BY f.tbl_Date desc";						
+							tbl.resSet = tbl.Execute_Query(query);				
+							tbl.resSet.first();
+							tbl.lastDate = tbl.resSet.getDate("tbl_Date");				    	  
 				    	    long milliseconds = tbl.lastDate.getTime();
 				    	    // Let's get current day
 				    	    Calendar cal = Calendar.getInstance();
@@ -377,16 +264,16 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 				    	    cal.set(Calendar.SECOND, 0);
 				    	    cal.set(Calendar.MILLISECOND, 0);
 				    	    Long currentDate = cal.getTimeInMillis();
+				    	    tbl.connection = ConnectionManager.getConnection();
+				    	    tbl.prepStmt = tbl.connection.prepareStatement("INSERT into finance.fin (tbl_Date, Flat, Mobile, Food, Alcohol, "
+				    	    		+ "Transport, Outdoor, Pauls_stuff, Income, Stuff) values(?,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)");
 				    	    
-				    	    PreparedStatement pStmt = connection.prepareStatement("INSERT into finance.fin (tbl_Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor, Pauls_stuff, Income, Stuff) values(?,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)");
-				    	    
-				    	    while (milliseconds < currentDate + MILS_IN_DAY) {
-				    	    				    	  
+				    	    while (milliseconds < currentDate + MILS_IN_DAY) {				    	    				    	  
 				    	    	milliseconds = milliseconds + MILS_IN_DAY;
-				    	    	pStmt.setDate(1, getDateForInsertion(milliseconds));
-				    	    	pStmt.addBatch();
+				    	    	tbl.prepStmt.setDate(1, getDateForInsertion(milliseconds));
+				    	    	tbl.prepStmt.addBatch();
 				    	    }
-				    	    pStmt.executeBatch();
+				    	    tbl.prepStmt.executeBatch();
 						} catch (Exception ee) {
 							ee.printStackTrace();
 						}				    							
@@ -394,63 +281,23 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 				}
 			);        
         
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-     //   frame.setContentPane(new TableWithBottomLine());
-        frame.setContentPane(tbl);        
-        new TableWithBottomLine().setOpaque(true); //content panes must be opaque        
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);     
+        frame.setContentPane(tbl);
+        tbl.setOpaque(true);               
         frame.pack();
         frame.setVisible(true);
     }
-
-  /*  class CustomActionListener implements WindowListener{
-    	public void windowOpened(WindowEvent e) {
-			try {							
-				Statement statement = newContentPane.connection.createStatement();
-				ResultSet rs = statement.executeQuery(
-						"SELECT tbl_Date as Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor, Pauls_stuff, Income, Stuff FROM finance.fin");
-				TableModel model = DbUtils.resultSetToTableModel(rs);						
-				newContentPane.table.setModel(model);														
-			} catch (SQLException ee) {}						
-		} */
-		
-    public static void connectToDB() {
-		try {
-			Properties prop = new Properties();
-			prop.setProperty("user", "root");
-			prop.setProperty("password", "");
-			connection = DriverManager.getConnection("jdbc:mysql://localhost/finance", prop);
-		} catch (SQLException e) {
-			System.out.println("Unable to connect to database");
-			System.exit(1);
-		}
-		
-	} 
-    
+	    
     public static void main(String[] args) {
-        //Schedule a job for the event-dispatching thread:
-        //creating and showing this application's GUI.
-   /*     javax.swing.SwingUtilities.invokeLater(new Runnable() {
+        //Schedule a job for the event-dispatching thread:        
+        javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 try {
 					createAndShowGUI();
-				} catch (SQLException e) {
-					// TODO Auto-generated catch block
+				} catch (Exception e) {					
 					e.printStackTrace();
 				}
             }
-        }); */
-    	try {
-		//	Properties prop = new Properties();
-		//	prop.setProperty("user", "root");
-		//	prop.setProperty("password", "");
-		//	connection = DriverManager.getConnection("jdbc:mysql://localhost/finance", prop);
-    		connectToDB();
-			createAndShowGUI();
-		} catch (Exception e) {
-	        e.printStackTrace();
-	    } /*finally {
-	        if (stmt != null)
-	            stmt.close();
-	    } */
+        }); 
     }
 }
