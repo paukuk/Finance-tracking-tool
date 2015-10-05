@@ -1,40 +1,34 @@
 package components;
-
+ 
 import javax.swing.JComponent;
-import javax.swing.JFrame;
+import javax.swing.JFrame; 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
+import javax.swing.JScrollPane; 
 import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
+
 import java.awt.event.*;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+
+
 public class TableWithBottomLine extends JPanel implements TableModelListener {
     
 	public final static long MILS_IN_DAY = 1000 * 60 * 60 * 24;
-	
-	private Connection connection = null;
-	private Statement stmt = null;
-	private PreparedStatement prepStmt = null;
-	private ResultSet resSet = null;
-	
+		
 	static JTable table;
 	static MyTableModel model;
 	JLabel bottomLabel;
@@ -94,39 +88,33 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         //Add the scroll pane to this panel.
         add(scrollPane, BorderLayout.CENTER);
     }
-        
-    public ResultSet Execute_Query(String queryIn) throws SQLException {
-   		
-    	try {    	   		
-   			connection = ConnectionManager.getConnection();   	
-   			stmt = connection.createStatement();
-    	    resSet = stmt.executeQuery(queryIn);    	   			
-   		} catch (SQLException e) {
-   			e.printStackTrace();
-   		}    	   		
-   		return resSet;
-   	}
-    
+       
     public String textForLabel() throws SQLException{
     	
        	List<Float> floatArrayList = new ArrayList<Float>();     
     	   	String query ="SELECT f.Flat, f.Mobile, f.Food, f.Alcohol, f.Transport, f.Outdoor, f.Pauls_stuff, f.Stuff FROM finance.fin f WHERE f.tbl_Date >= DATE_FORMAT( NOW( ) ,  '%Y-%m-10' ) + INTERVAL IF( DAY( NOW( ) ) >10, 0 , -1 ) MONTH AND f.tbl_Date <= CURDATE( ) ";
-    	   	try {    	   	    
-    	    	ResultSet rs = null;
-    	    	rs = Execute_Query(query);    	    	
-    	    	while (rs.next()){
-    	    	  floatArrayList.add(rs.getFloat("Flat"));
-    	    	  floatArrayList.add(rs.getFloat("Mobile"));
-    	    	  floatArrayList.add(rs.getFloat("Food"));
-    	    	  floatArrayList.add(rs.getFloat("Alcohol"));
-    	    	  floatArrayList.add(rs.getFloat("Transport"));
-    	    	  floatArrayList.add(rs.getFloat("Outdoor"));
-    	    	  floatArrayList.add(rs.getFloat("Pauls_stuff"));
-    	    	  floatArrayList.add(rs.getFloat("Stuff"));
+    	   	Connection connection = null;
+       		Statement stmt = null;
+    	   	ResultSet resSet = null;
+    	   	try {
+    	   		connection = ConnectionManager.getConnection();
+       			stmt = connection.createStatement();
+        	    resSet = stmt.executeQuery(query);    	   		    	    	
+    	    	while (resSet.next()){
+    	    	  floatArrayList.add(resSet.getFloat("Flat"));
+    	    	  floatArrayList.add(resSet.getFloat("Mobile"));
+    	    	  floatArrayList.add(resSet.getFloat("Food"));
+    	    	  floatArrayList.add(resSet.getFloat("Alcohol"));
+    	    	  floatArrayList.add(resSet.getFloat("Transport"));
+    	    	  floatArrayList.add(resSet.getFloat("Outdoor"));
+    	    	  floatArrayList.add(resSet.getFloat("Pauls_stuff"));
+    	    	  floatArrayList.add(resSet.getFloat("Stuff"));
     	    	}    	    
     	   } catch(SQLException ee){
     		   ee.printStackTrace();
-    	     }   
+    	     } finally {
+    	         closeAll(resSet, stmt, null, connection);
+    	     }  
     	    Float[] array = floatArrayList.toArray(new Float[floatArrayList.size()]);  
     	    float temp1 =0.0f;
     	    for (int i=0; i<array.length; i++){    	    	
@@ -159,7 +147,9 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     public class ImportData {    
 
     	public ImportData(String a, Object b, Object c)
-    	        throws ClassNotFoundException, SQLException {    	
+    	        throws ClassNotFoundException, SQLException {
+    		Connection connection = null;
+    		PreparedStatement prepStmt = null;
     	    try {
     	    	connection = ConnectionManager.getConnection();
     	        String colName = a;
@@ -174,10 +164,9 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	    } catch (SQLException e) {
     	        e.printStackTrace();
     	    } 
-    	      finally {
-    	        if (prepStmt != null)
-    	            prepStmt.close();
-    	    }  
+    	    finally {
+    	   		closeAll(null, null, prepStmt, connection);
+    	   	}  
     	}   
     }
     
@@ -190,26 +179,37 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     		String query ="SELECT ID, tbl_Date as Date, Flat, Mobile, Food, Alcohol, Transport, Outdoor"
     				+ ", Pauls_stuff, Income, Stuff FROM finance.fin";    	
     	    
-    		ResultSet rs = null;
-    	   	rs = Execute_Query(query);
-     	    rs.last();
-    	    rowCount = rs.getRow();
+    		Connection connection = null;
+       		Statement stmt = null;
+    	   	ResultSet resSet = null;
+    	   	try {
+    	   		connection = ConnectionManager.getConnection();
+       			stmt = connection.createStatement();
+        	    resSet = stmt.executeQuery(query); 
+   // TO DO Maybe there is a cheaper way to get the row count than resSet.last();    
+        	    resSet.last();
+    	    rowCount = resSet.getRow();
     	    data = new Object[rowCount][11];
-    	    rs = Execute_Query(query);
+    	    resSet.beforeFirst();    	       	    
     	    for (int iEil = 0; iEil < rowCount; iEil++){
-    	        rs.next();
-    	        data[iEil][0] = rs.getInt("ID");
-    	        data[iEil][1] = rs.getDate("Date");
-    	        data[iEil][2] = rs.getFloat("Flat");
-    	        data[iEil][3]  = rs.getFloat("Mobile");
-    	        data[iEil][4] = rs.getFloat("Food");
-    	        data[iEil][5]  = rs.getFloat("Alcohol");
-    	        data[iEil][6] = rs.getFloat("Transport");
-    	        data[iEil][7] = rs.getFloat("Outdoor");
-    	        data[iEil][8] = rs.getFloat("Pauls_stuff");
-    	        data[iEil][9] = rs.getFloat("Income");
-    	        data[iEil][10] = rs.getFloat("Stuff");     	       
+    	    	resSet.next();
+    	        data[iEil][0] = resSet.getInt("ID");
+    	        data[iEil][1] = resSet.getDate("Date");
+    	        data[iEil][2] = resSet.getFloat("Flat");
+    	        data[iEil][3]  = resSet.getFloat("Mobile");
+    	        data[iEil][4] = resSet.getFloat("Food");
+    	        data[iEil][5]  = resSet.getFloat("Alcohol");
+    	        data[iEil][6] = resSet.getFloat("Transport");
+    	        data[iEil][7] = resSet.getFloat("Outdoor");
+    	        data[iEil][8] = resSet.getFloat("Pauls_stuff");
+    	        data[iEil][9] = resSet.getFloat("Income");
+    	        data[iEil][10] = resSet.getFloat("Stuff");     	       
     	    }
+    	   	} catch(SQLException e){
+    	   		e.printStackTrace();
+    	   	} finally {
+    	   		closeAll(resSet, stmt, null, connection);
+    	   	}
             String[] columnName  = {"ID", "Date","Flat","Mobile"    	 
     	            ,"Food","Alcohol","Transport", "Outdoor", "Pauls_stuff", "Income", "Stuff"};
     	     columnNames = columnName;
@@ -245,17 +245,23 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     
     private static void createAndShowGUI() throws SQLException {
         JFrame frame = new JFrame("TableWithBottomLine");
-        TableWithBottomLine tbl = new TableWithBottomLine();        
+        TableWithBottomLine tbl = new TableWithBottomLine();
         
         frame.addWindowListener(
 				new WindowAdapter() {
 					public void windowOpened(WindowEvent e) {
+						Connection connection = null;
+			       		Statement stmt = null;
+			       		PreparedStatement prepStmt = null;
+			    	   	ResultSet resSet = null;
 						try {						
 							tbl.bottomLabel2.setText("Text");				    	    
 							String query ="SELECT f.tbl_Date FROM finance.fin f ORDER BY f.tbl_Date desc";						
-							tbl.resSet = tbl.Execute_Query(query);				
-							tbl.resSet.first();
-							tbl.lastDate = tbl.resSet.getDate("tbl_Date");				    	  
+							connection = ConnectionManager.getConnection();
+			       			stmt = connection.createStatement();
+			        	    resSet = stmt.executeQuery(query);											
+							resSet.first();
+							tbl.lastDate = resSet.getDate("tbl_Date");				    	  
 				    	    long milliseconds = tbl.lastDate.getTime();
 				    	    // Let's get current day
 				    	    Calendar cal = Calendar.getInstance();
@@ -263,23 +269,24 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 				    	    cal.set(Calendar.MINUTE, 0);
 				    	    cal.set(Calendar.SECOND, 0);
 				    	    cal.set(Calendar.MILLISECOND, 0);
-				    	    Long currentDate = cal.getTimeInMillis();
-				    	    tbl.connection = ConnectionManager.getConnection();
-				    	    tbl.prepStmt = tbl.connection.prepareStatement("INSERT into finance.fin (tbl_Date, Flat, Mobile, Food, Alcohol, "
+				    	    Long currentDate = cal.getTimeInMillis();				    	
+				    	    prepStmt = connection.prepareStatement("INSERT into finance.fin (tbl_Date, Flat, Mobile, Food, Alcohol, "
 				    	    		+ "Transport, Outdoor, Pauls_stuff, Income, Stuff) values(?,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)");
 				    	    
 				    	    while (milliseconds < currentDate + MILS_IN_DAY) {				    	    				    	  
 				    	    	milliseconds = milliseconds + MILS_IN_DAY;
-				    	    	tbl.prepStmt.setDate(1, getDateForInsertion(milliseconds));
-				    	    	tbl.prepStmt.addBatch();
+				    	    	prepStmt.setDate(1, getDateForInsertion(milliseconds));
+				    	    	prepStmt.addBatch();
 				    	    }
-				    	    tbl.prepStmt.executeBatch();
-						} catch (Exception ee) {
+				    	    prepStmt.executeBatch();
+						} catch (SQLException ee) {
 							ee.printStackTrace();
-						}				    							
+						} finally {
+			    	   		closeAll(resSet, stmt, prepStmt, connection);
+			    	   	} 				    							
 					} 
 				}
-			);        
+			);         
         
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);     
         frame.setContentPane(tbl);
@@ -292,12 +299,43 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         //Schedule a job for the event-dispatching thread:        
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                try {
-					createAndShowGUI();
+                try {   
+                	createAndShowGUI();
 				} catch (Exception e) {					
 					e.printStackTrace();
 				}
             }
         }); 
     }
+ 
+    private static void closeAll(ResultSet resSet, Statement stmt, PreparedStatement prepStmt, Connection connection) {
+        if (resSet != null) {
+          try {
+        	  resSet.close();
+          } catch (SQLException e) {
+        	  e.printStackTrace();
+          } 
+        }
+        if (stmt != null) {
+          try {
+        	  stmt.close();
+          } catch (SQLException e) {
+        	  e.printStackTrace();
+          } 
+        }
+        if (prepStmt != null) {
+            try {
+            	prepStmt.close();
+            } catch (SQLException e) {
+            	e.printStackTrace();
+            } 
+          }
+        if (connection != null) {
+          try {
+            connection.close();
+          } catch (SQLException e) {
+        	  e.printStackTrace();
+          } 
+        }
+      }
 }
