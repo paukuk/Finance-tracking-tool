@@ -9,6 +9,7 @@ import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 
 import java.awt.event.*;
@@ -18,10 +19,12 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.sql.*;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
 
 
 
@@ -34,6 +37,7 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 	JLabel bottomLabel;
 	JLabel bottomLabel2;		
 	java.util.Date lastDate;
+	int quantityOfColumns = 11;
 	
     public TableWithBottomLine() throws SQLException {
     	
@@ -48,7 +52,8 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         panel.add(bottomLabel2);
         add(panel, BorderLayout.PAGE_END);
         
-          table = new JTable(new MyTableModel())      
+                
+        table = new JTable(new MyTableModel())      
         {
         	//Alternate color of table rows
         	public Component prepareRenderer(TableCellRenderer renderer, int row, int column) {        	
@@ -76,6 +81,10 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         	}        	
         };
         
+        for (int i=2; i<quantityOfColumns;i++){
+        	table.getColumnModel().getColumn(i).setCellRenderer(new DecimalFormatRenderer());
+        } 
+              
         table.removeColumn(table.getColumnModel().getColumn(0));   
         table.setPreferredScrollableViewportSize(new Dimension(900, 330));
         table.setFillsViewportHeight(true);
@@ -120,10 +129,10 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	    for (int i=0; i<array.length; i++){    	    	
     	    	temp1 = temp1 + array[i];    	   
     	    }
-    	    float sumToSpend = 1250.0f;
+    	    float sumToSpend = 800.00f;
     	    sumToSpend = sumToSpend - temp1;
     	    String stringForLabel = Float.toString(sumToSpend);
-    	    return "This month you can spend: -"+stringForLabel+"Lt";
+    	    return "This month you can spend: -"+stringForLabel+"Eur";
     }  
     
     public void tableChanged(TableModelEvent e) {
@@ -131,11 +140,11 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         int col = e.getColumn();
         model = (MyTableModel) e.getSource();
         String colName = model.getColumnName(col);
-        Object cellValue = model.getValueAt(row, col);
-        Object cell_Id = model.getValueAt(row, 0);
+        Object cellValue = model.getValueAt(row, col);        
+        Object cellId = model.getValueAt(row, 0);
 
         try {
-            new ImportData(colName, cellValue, cell_Id);
+            new ImportData(colName, cellValue, cellId);
             bottomLabel.setText(textForLabel());
         } catch (ClassNotFoundException e1) {
             e1.printStackTrace();
@@ -149,17 +158,17 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	public ImportData(String a, Object b, Object c)
     	        throws ClassNotFoundException, SQLException {
     		Connection connection = null;
-    		PreparedStatement prepStmt = null;
+    		PreparedStatement prepStmt = null;    		
     	    try {
     	    	connection = ConnectionManager.getConnection();
-    	        String colName = a;
-    	        String cellValue = b.toString();
-    	        String cell_Id = c.toString();    	
-    	        String updateString = "update finance.fin " + "set ? = ? " + "where ID = ? "+ ";";
+    	        String colName = a;    	        
+    	        float cellValue = (float) b;
+    	        int cellId = (int) c;    	        
+    	        String updateString = "update finance.fin " + "set " + colName + "= ? " + "where ID = ? "+ ";";
     	        prepStmt = connection.prepareStatement(updateString);
-    	        prepStmt.setString(1, colName);
-    	        prepStmt.setString(2, cellValue);
-    	        prepStmt.setString(3, cell_Id);    	        
+    	        prepStmt.setFloat(1, cellValue);
+    	        prepStmt.setInt(2, cellId);    	        
+    	        prepStmt.executeUpdate();  
     	        
     	    } catch (SQLException e) {
     	        e.printStackTrace();
@@ -186,7 +195,7 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
     	   		connection = ConnectionManager.getConnection();
        			stmt = connection.createStatement();
         	    resSet = stmt.executeQuery(query); 
-   // TO DO Maybe there is a cheaper way to get the row count than resSet.last();    
+   // TO-DO Maybe there is a cheaper way to get the row count than resSet.last();    
         	    resSet.last();
     	    rowCount = resSet.getRow();
     	    data = new Object[rowCount][11];
@@ -254,7 +263,11 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 			       		Statement stmt = null;
 			       		PreparedStatement prepStmt = null;
 			    	   	ResultSet resSet = null;
-						try {						
+						/* Code for future data which will come from excel DB or .json file for currency converting to Euros
+			    	   	//Connection connection2 = null;			    	   	
+			       		Statement stmtForEuros = null; */
+			    	   	
+			    	   	try {						
 							tbl.bottomLabel2.setText("Text");				    	    
 							String query ="SELECT f.tbl_Date FROM finance.fin f ORDER BY f.tbl_Date desc";						
 							connection = ConnectionManager.getConnection();
@@ -278,7 +291,16 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
 				    	    	prepStmt.setDate(1, getDateForInsertion(milliseconds));
 				    	    	prepStmt.addBatch();
 				    	    }
-				    	    prepStmt.executeBatch();
+				    	    prepStmt.executeBatch();				    	    
+				    	   /* Code for future data which will come from excel DB or .json file for currency converting to Euros 
+				    	    // Multiply all cells in rows except ID and tbl_Date by 3.4528f
+				    	    stmtForEuros = connection.createStatement();
+				    	    String queryForEuros = "UPDATE finance.fin f SET f.Flat = f.Flat * 3.4528, f.Mobile = f.Mobile * 3.4528, "
+				    	    		+ "f.Food = f.Food * 3.4528, f.Alcohol = f.Alcohol * 3.4528, f.Transport = f.Transport * 3.4528, "
+				    	    		+ "f.Outdoor = f.Outdoor * 3.4528, f.Pauls_stuff = f.Pauls_stuff * 3.4528, f.Income = f.Income * 3.4528, "
+				    	    		+ "f.Stuff = f.Stuff * 3.4528";				    	    
+				    	    stmtForEuros.executeUpdate(queryForEuros); */
+				    	    
 						} catch (SQLException ee) {
 							ee.printStackTrace();
 						} finally {
@@ -300,7 +322,7 @@ public class TableWithBottomLine extends JPanel implements TableModelListener {
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 try {   
-                	createAndShowGUI();
+                	createAndShowGUI();                	
 				} catch (Exception e) {					
 					e.printStackTrace();
 				}
